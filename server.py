@@ -29,6 +29,7 @@ repository = ChatRepository()
 _rates = {}
 _rate_lock = threading.Lock()
 
+
 def active(claims):
     return repository.active(claims)
 
@@ -43,6 +44,32 @@ def authenticated(fn):
             return jsonify(error='Autenticação necessária'), 401
         return fn(*args, **kwargs)
     return wrapped
+
+@app.get('/push/config')
+@authenticated
+def push_config():
+    return jsonify(webPublicKey=os.environ.get('VAPID_PUBLIC_KEY'),webEnabled=bool(os.environ.get('VAPID_PRIVATE_KEY') and os.environ.get('VAPID_SUBJECT')))
+
+@app.put('/push/devices/<device_id>')
+@authenticated
+def register_push(device_id):
+    from chat.push import PushStore
+    try:
+        uuid.UUID(device_id)
+        data=request.get_json()
+        if not isinstance(data,dict) or data.get('userId')!=g.identity['uid']: raise ValueError('Conta inválida')
+        PushStore(repository).register(g.identity,device_id,data)
+    except (ValueError,TypeError,AttributeError): return jsonify(error='Dispositivo de notificações inválido'),400
+    return jsonify(success=True),200
+
+@app.delete('/push/devices/<device_id>')
+@authenticated
+def remove_push(device_id):
+    from chat.push import PushStore
+    try: uuid.UUID(device_id)
+    except ValueError: return jsonify(error='Dispositivo inválido'),400
+    PushStore(repository).remove(g.identity,device_id)
+    return jsonify(success=True)
 
 @app.errorhandler(Exception)
 def unexpected(error):
@@ -203,4 +230,6 @@ def load_messages(data):
 
 if __name__ == '__main__':
     from waitress import serve
+    from chat.push import start_worker
+    start_worker(repository,app.logger)
     serve(app, host=os.environ.get('HOST', '127.0.0.1'), port=int(os.environ.get('PORT', '5000')), threads=32)

@@ -72,7 +72,10 @@ class ChatRepository:
     def save(self, sender, recipient, text):
         with self.connection() as (_, cur):
             cur.execute('INSERT INTO messages (sender,recipient,text,timestamp) VALUES (%s,%s,%s,UTC_TIMESTAMP(6))', (sender,recipient,text))
-            return cur.lastrowid
+            message_id=cur.lastrowid
+            from chat.push import enqueue
+            enqueue(cur,message_id,recipient)
+            return message_id
 
     def history(self, user, recipient, before):
         with self.connection() as (_, cur):
@@ -111,4 +114,7 @@ class ChatRepository:
                 cur.execute('SELECT id FROM chat_attachments WHERE id=%s AND sender=%s AND recipient=%s AND id_cede=%s',(attachment_id,identity['uid'],recipient,identity['cede']))
                 if not cur.fetchone(): raise ValueError('Anexo inacessível')
             cur.execute('INSERT INTO messages(sender,recipient,text,attachment_id,client_id,timestamp) VALUES (%s,%s,%s,%s,%s,UTC_TIMESTAMP(6))',(identity['uid'],recipient,text,attachment_id,client_id))
-            return cur.lastrowid
+            message_id=cur.lastrowid
+            from chat.push import enqueue
+            enqueue(cur,message_id,recipient)
+            return message_id

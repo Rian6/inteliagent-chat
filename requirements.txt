@@ -5,3 +5,4 @@ mysql-connector-python==26.10.0
 PyJWT==2.15.1
 simple-websocket==1.1.0
 waitress==3.0.2
+pywebpush==2.5.0
