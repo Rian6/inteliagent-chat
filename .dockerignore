@@ -1,0 +1,5 @@
+*
+!requirements.txt
+!requirements.lock
+!server.py
+!chat/**
